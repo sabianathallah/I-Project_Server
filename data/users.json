@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "fullName": "Admin User",
+    "email": "admin@museum.com",
+    "password": "admin123",
+    "role": "admin"
+  },
+  {
+    "id": 2,
+    "fullName": "Staff Museum",
+    "email": "staff@museum.com",
+    "password": "staff123",
+    "role": "staff"
+  },
+  {
+    "id": 3,
+    "fullName": "John Doe",
+    "email": "john@example.com",
+    "password": "user123",
+    "role": "user"
+  },
+  {
+    "id": 4,
+    "fullName": "Jane Smith",
+    "email": "jane@example.com",
+    "password": "user123",
+    "role": "user"
+  }
+]

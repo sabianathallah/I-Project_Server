@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "name_ofPeriod": "Prasejarah"
+  },
+  {
+    "id": 2,
+    "name_ofPeriod": "Klasik (Hindu-Buddha)"
+  },
+  {
+    "id": 3,
+    "name_ofPeriod": "Islam"
+  },
+  {
+    "id": 4,
+    "name_ofPeriod": "Kolonial"
+  }
+]

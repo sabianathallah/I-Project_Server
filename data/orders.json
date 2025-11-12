@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "UserId": 3,
+    "price_amount": 50000,
+    "midtrans_orderId": "ORDER-001-2025",
+    "qrString": "QR-CODE-STRING-001",
+    "status": "paid",
+    "paidAt": "2025-11-10T10:30:00.000Z",
+    "expiredAt": "2025-11-15T23:59:59.000Z"
+  },
+  {
+    "id": 2,
+    "UserId": 4,
+    "price_amount": 30000,
+    "midtrans_orderId": null,
+    "qrString": null,
+    "status": "pending",
+    "paidAt": null,
+    "expiredAt": "2025-11-13T23:59:59.000Z"
+  }
+]
