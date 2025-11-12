@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -11,6 +12,9 @@ module.exports = {
 
     const users = usersData.map(el => {
       delete el.id;
+      // Hash password before inserting
+      const salt = bcrypt.genSaltSync(10);
+      el.password = bcrypt.hashSync(el.password, salt);
       el.createdAt = el.updatedAt = new Date();
       return el;
     });
