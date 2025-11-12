@@ -14,7 +14,7 @@ class LoginRegisterController {
 
             res.status(201).json({
                 message: "Success create new user",
-                user
+                email: user.email
             })
         } catch (err) {
             next(err)
