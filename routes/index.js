@@ -4,6 +4,7 @@ const router = express.Router()
 const articleRouter = require('./article')
 const periodRouter = require('./period')
 const orderRouter = require('./order')
+const chatRouter = require('./chat')
 
 const LoginRegisterController = require('../controllers/../controllers/loginRegisterController')
 const ArticleController = require('../controllers/articleController')
@@ -26,6 +27,7 @@ router.post('/google-login', LoginRegisterController.googleLogin)
 
 //================ USE MIDDLEWARE AUTHENTICATION (FOR PUBLIC ROUTES WITH AUTHENTICATION)
 router.use('/orders', authentication, orderRouter)
+router.use('/chat', authentication, chatRouter)
 
 
 //=============================================== ADMIN-ONLY ENDPOINTS
