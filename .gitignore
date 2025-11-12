@@ -1,2 +1,6 @@
 node_modules
 .env
+MIDTRANS_TEST_RESULTS.md
+test_midtrans.sh
+test-*.js
+test-*.sh
