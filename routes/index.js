@@ -31,7 +31,7 @@ router.use('/chat', authentication, chatRouter)
 
 
 //=============================================== ADMIN-ONLY ENDPOINTS
-router.use(isAdmin)
+router.use(authentication, isAdmin)
 router.use('/articles', articleRouter)
 router.use('/periods', periodRouter)
 
