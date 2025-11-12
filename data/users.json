@@ -8,20 +8,13 @@
   },
   {
     "id": 2,
-    "fullName": "Staff Museum",
-    "email": "staff@museum.com",
-    "password": "staff123",
-    "role": "staff"
-  },
-  {
-    "id": 3,
     "fullName": "John Doe",
     "email": "john@example.com",
     "password": "user123",
     "role": "user"
   },
   {
-    "id": 4,
+    "id": 3,
     "fullName": "Jane Smith",
     "email": "jane@example.com",
     "password": "user123",

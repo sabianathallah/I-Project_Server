@@ -61,8 +61,8 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 'user',
       validate: {
         isIn: {
-          args: [['admin', 'staff', 'user']],
-          msg: 'Role must be admin, staff, or user'
+          args: [['admin', 'user']],
+          msg: 'Role must be admin or user'
         }
       }
     }

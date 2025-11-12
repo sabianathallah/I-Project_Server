@@ -14,7 +14,7 @@
     "summary": "Sejarah dan peninggalan Kerajaan Majapahit",
     "content": "Kerajaan Majapahit adalah salah satu kerajaan terbesar di Nusantara. Didirikan pada tahun 1293, kerajaan ini mencapai puncak kejayaannya di bawah pemerintahan Hayam Wuruk dengan Mahapatih Gajah Mada.",
     "imageUrl": "https://example.com/majapahit.jpg",
-    "UserId": 2,
+    "UserId": 1,
     "PeriodId": 2
   },
   {
@@ -23,7 +23,7 @@
     "summary": "Sejarah Jakarta pada masa penjajahan Belanda",
     "content": "Batavia adalah nama Jakarta pada masa kolonial Belanda. Kota ini menjadi pusat pemerintahan VOC dan memiliki banyak bangunan bersejarah yang masih terjaga hingga kini.",
     "imageUrl": "https://example.com/batavia.jpg",
-    "UserId": 2,
+    "UserId": 1,
     "PeriodId": 4
   }
 ]
