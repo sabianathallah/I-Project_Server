@@ -32,6 +32,10 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true
       },
+      ticketCode: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
       status: {
         type: Sequelize.STRING,
         allowNull: false,
@@ -44,6 +48,19 @@ module.exports = {
       expiredAt: {
         type: Sequelize.DATE,
         allowNull: true
+      },
+      museumName: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      visitDate: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
+      ticketQuantity: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        defaultValue: 1
       },
       createdAt: {
         allowNull: false,

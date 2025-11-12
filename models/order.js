@@ -10,13 +10,6 @@ module.exports = (sequelize, DataTypes) => {
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE'
       });
-
-      // Order has many OrderItems
-      Order.hasMany(models.OrderItem, {
-        foreignKey: 'orderId',
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE'
-      });
     }
   }
 
@@ -51,14 +44,18 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true
     },
+    ticketCode: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
     status: {
       type: DataTypes.STRING,
       allowNull: false,
       defaultValue: 'pending',
       validate: {
         isIn: {
-          args: [['pending', 'paid', 'cancelled', 'expired']],
-          msg: 'Status must be pending, paid, cancelled, or expired'
+          args: [['pending', 'paid', 'cancelled', 'expired', 'used']],
+          msg: 'Status must be pending, paid, cancelled, expired, or used'
         }
       }
     },
@@ -69,6 +66,25 @@ module.exports = (sequelize, DataTypes) => {
     expiredAt: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+    museumName: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    visitDate: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    ticketQuantity: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+      validate: {
+        min: {
+          args: [1],
+          msg: 'Ticket quantity must be at least 1'
+        }
+      }
     }
   }, {
     sequelize,

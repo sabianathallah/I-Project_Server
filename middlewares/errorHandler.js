@@ -2,6 +2,9 @@ const errorHandler = (err, req, res, next) => {
     let status = 500
     let message = 'Internal Server Error'
 
+    // Log error for debugging (optional, can be removed in production)
+    console.error('Error:', err.name, err.message);
+
     if (err.name == 'SequelizeValidationError') {
         status = 400
         message = err.errors[0].message
@@ -40,6 +43,12 @@ const errorHandler = (err, req, res, next) => {
     if (err.name == 'NotFound') {
         status = 404
         message = `Data not found`
+    }
+
+    // Handle Google OAuth errors
+    if (err.message && err.message.includes('Token')) {
+        status = 401
+        message = 'Invalid Google token'
     }
 
     res.status(status).json({
