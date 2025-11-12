@@ -14,6 +14,7 @@ const authentication = async (req, res, next) => {
         const tokenUserId = decoded.id || decoded.userId
 
         req.user = {
+            id: decoded.id || decoded.userId,
             userId: decoded.id || decoded.userId,
             email: decoded.email,
             role: decoded.role

@@ -8,9 +8,8 @@ class LoginRegisterController {
         try {
             const { email, password, role, fullName } = req.body
             if (!email || !password) throw { name: "BadRequest" }
-            // hash password before creating user
-            const hashed = hash(password)
-            const user = await User.create({ email, password: hashed, role: role || "user", fullName })
+            // No need to hash here, model hook will handle it
+            const user = await User.create({ email, password, role: role || "user", fullName })
 
             res.status(201).json({
                 message: "Success create new user",

@@ -12,7 +12,7 @@ const PeriodController = require('../controllers/periodController')
 //=============================================== IMPORT MIDDLEWARE
 const authentication = require('../middlewares/authentication')
 const errorHandler = require('../middlewares/errorHandler')
-const {isAdmin} = require('../middlewares/authorization')
+const isAdmin = require('../middlewares/authorization')
 
 
 //=============================================== ENDPOINT (PUBLIC) 
@@ -29,6 +29,8 @@ router.use(authentication)
 
 //=============================================== ENDPOINT (PRIVATE)
 router.use(isAdmin)
+router.use('/articles', articleRouter)
+router.use('/periods', periodRouter)
 
 
 //=============================================== USE ERRORHANDLER
