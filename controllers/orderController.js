@@ -1,19 +1,28 @@
 const midtransClient = require('midtrans-client');
+const crypto = require('crypto');
 const { Order, User } = require('../models');
+
+// FIXED PRICE PER TICKET
+const TICKET_PRICE = 20000; // Rp 20.000 per tiket
 
 module.exports = {
   // create an order and return Midtrans snap token / redirect info
   create: async (req, res, next) => {
     try {
-      const { price_amount, ticketQuantity = 1, museumName, visitDate } = req.body;
+      const { ticketQuantity = 1, museumName, visitDate } = req.body;
       const UserId = req.user && req.user.id;
 
       if (!UserId) throw { name: 'Unauthorized', message: 'User is not authenticated' };
-      if (!price_amount) throw { name: 'BadRequest', message: 'price_amount is required' };
+      if (!ticketQuantity || ticketQuantity < 1) {
+        throw { name: 'BadRequest', message: 'ticketQuantity must be at least 1' };
+      }
+
+      // Calculate total price (BACKEND VALIDATION - SECURITY)
+      const totalPrice = TICKET_PRICE * ticketQuantity;
 
       const order = await Order.create({
         UserId,
-        price_amount,
+        price_amount: totalPrice,
         ticketQuantity,
         museumName,
         visitDate,
@@ -28,18 +37,15 @@ module.exports = {
 
       const orderIdString = `ORDER-${order.id}-${Date.now()}`;
 
-      // Calculate price per item (assuming price_amount is total)
-      const pricePerItem = Math.floor(Number(price_amount) / Number(ticketQuantity));
-
       const parameter = {
         transaction_details: {
           order_id: orderIdString,
-          gross_amount: Number(price_amount)
+          gross_amount: totalPrice
         },
         item_details: [
           {
             id: `ticket-${order.id}`,
-            price: pricePerItem,
+            price: TICKET_PRICE,
             quantity: Number(ticketQuantity),
             name: `Ticket - ${museumName || 'Museum'}`
           }
@@ -58,10 +64,109 @@ module.exports = {
       res.status(201).json({
         message: 'Order created, Midtrans transaction created',
         order,
+        ticketPrice: TICKET_PRICE,
+        totalPrice,
         midtrans: transaction
       });
     } catch (err) {
       console.error('Order create error:', err.message);
+      console.error('Full error:', err);
+      next(err);
+    }
+  },
+
+  // WEBHOOK HANDLER - Menerima notifikasi dari Midtrans
+  handleWebhook: async (req, res, next) => {
+    try {
+      const notification = req.body;
+      console.log('=== MIDTRANS WEBHOOK RECEIVED ===');
+      console.log(notification);
+
+      // Verify signature from Midtrans
+      const serverKey = process.env.MIDTRANS_SERVER_KEY;
+      const orderId = notification.order_id;
+      const statusCode = notification.status_code;
+      const grossAmount = notification.gross_amount;
+      const signatureKey = notification.signature_key;
+
+      // Create hash for verification
+      const hash = crypto
+        .createHash('sha512')
+        .update(`${orderId}${statusCode}${grossAmount}${serverKey}`)
+        .digest('hex');
+
+      // Verify signature
+      if (hash !== signatureKey) {
+        console.error('Invalid signature');
+        return res.status(403).json({ message: 'Invalid signature' });
+      }
+
+      console.log('✅ Signature verified');
+
+      // Find order by midtrans_orderId
+      const order = await Order.findOne({ where: { midtrans_orderId: orderId } });
+      if (!order) {
+        console.error('Order not found:', orderId);
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      const transactionStatus = notification.transaction_status;
+      const fraudStatus = notification.fraud_status;
+
+      console.log('Transaction status:', transactionStatus);
+      console.log('Fraud status:', fraudStatus);
+
+      // Generate ticket code function
+      const generateTicketCode = () => {
+        const timestamp = Date.now().toString(36).toUpperCase();
+        const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+        return `TIX-${timestamp}-${random}`;
+      };
+
+      // Update order status based on Midtrans notification
+      if (transactionStatus === 'capture') {
+        if (fraudStatus === 'accept') {
+          // Payment captured successfully
+          await order.update({
+            status: 'paid',
+            paidAt: new Date(),
+            ticketCode: generateTicketCode()
+          });
+          console.log('✅ Order status updated to PAID');
+        }
+      } else if (transactionStatus === 'settlement') {
+        // Payment settled
+        await order.update({
+          status: 'paid',
+          paidAt: new Date(),
+          ticketCode: generateTicketCode()
+        });
+        console.log('✅ Order status updated to PAID (settlement)');
+      } else if (transactionStatus === 'pending') {
+        // Payment pending
+        await order.update({ status: 'pending' });
+        console.log('⏳ Order status: PENDING');
+      } else if (transactionStatus === 'deny') {
+        // Payment denied
+        await order.update({ status: 'cancelled' });
+        console.log('❌ Order status updated to CANCELLED (deny)');
+      } else if (transactionStatus === 'expire') {
+        // Payment expired
+        await order.update({
+          status: 'expired',
+          expiredAt: new Date()
+        });
+        console.log('⏰ Order status updated to EXPIRED');
+      } else if (transactionStatus === 'cancel') {
+        // Payment cancelled
+        await order.update({ status: 'cancelled' });
+        console.log('❌ Order status updated to CANCELLED');
+      }
+
+      // Send success response to Midtrans
+      res.status(200).json({ message: 'Webhook processed successfully' });
+    } catch (err) {
+      console.error('Webhook error:', err.message);
       console.error('Full error:', err);
       next(err);
     }

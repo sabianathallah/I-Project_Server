@@ -9,6 +9,7 @@ const chatRouter = require('./chat')
 const LoginRegisterController = require('../controllers/../controllers/loginRegisterController')
 const ArticleController = require('../controllers/articleController')
 const PeriodController = require('../controllers/periodController')
+const OrderController = require('../controllers/orderController')
 
 const authentication = require('../middlewares/authentication')
 const errorHandler = require('../middlewares/errorHandler')
@@ -19,6 +20,10 @@ const isAdmin = require('../middlewares/authorization')
 router.get('/pub/articles', ArticleController.read)
 router.get('/pub/articles/:id', ArticleController.detailById)
 router.get('/pub/periods', PeriodController.read)
+
+//=============================================== MIDTRANS WEBHOOK (PUBLIC - NO AUTH)
+// This endpoint is called by Midtrans server, not by users
+router.post('/orders/webhook', OrderController.handleWebhook)
 
 //=============================================== ENDPOINT USER
 router.post('/login', LoginRegisterController.login)

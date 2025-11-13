@@ -7,12 +7,63 @@ http://localhost:3000
 
 ---
 
+## 🔔 Important Updates (v2.0)
+
+### Breaking Changes in Order API
+
+**Changed:** Order creation no longer accepts `price_amount` in request body.
+
+**Before (v1.0):**
+```json
+{
+  "price_amount": 50000,
+  "ticketQuantity": 2
+}
+```
+
+**Now (v2.0):**
+```json
+{
+  "ticketQuantity": 2
+}
+```
+
+**Why?** 
+- **Security**: Fixed ticket price (Rp 20,000) enforced by backend
+- **Consistency**: Prevents price manipulation from frontend
+- **Simplicity**: Frontend only sends quantity, backend calculates total
+
+### New Features
+
+✅ **Automatic Webhook Integration**
+- Real-time order status updates from Midtrans
+- No manual status checking required
+- Automatic ticket code generation
+
+✅ **Fixed Ticket Pricing**
+- **Rp 20,000 per ticket** (backend enforced)
+- Total price: `20,000 × ticketQuantity`
+
+✅ **Ticket Code Generation**
+- Auto-generated upon successful payment
+- Format: `TIX-{timestamp}-{random}`
+- Example: `TIX-MHX6REEH-Z1EZ1D`
+
+---
+
 ## Table of Contents
 1. [Authentication](#authentication)
 2. [Public Endpoints](#public-endpoints)
 3. [User Endpoints (Authenticated)](#user-endpoints-authenticated)
+   - [Orders](#orders)
+   - [Chat](#chat)
 4. [Admin Endpoints (Admin Only)](#admin-endpoints-admin-only)
-5. [Error Responses](#error-responses)
+   - [Articles](#articles-admin)
+   - [Periods](#periods-admin)
+5. [Webhook Endpoints](#webhook-endpoints)
+6. [Error Responses](#error-responses)
+7. [Data Models](#data-models)
+8. [Notes](#notes)
 
 ---
 
@@ -210,15 +261,24 @@ Create a new order and initiate Midtrans payment transaction.
 
 **Authentication:** Required
 
+**Important Notes:**
+- Ticket price is fixed at **Rp 20,000 per ticket** (calculated by backend)
+- No need to send `price_amount` in request body
+- Total price is automatically calculated: `20,000 × ticketQuantity`
+
 **Request Body:**
 ```json
 {
-  "price_amount": 50000,
   "ticketQuantity": 2,
   "museumName": "National Museum",
   "visitDate": "2025-12-01"
 }
 ```
+
+**Request Body Fields:**
+- `ticketQuantity` (integer, required) - Number of tickets to purchase (minimum: 1)
+- `museumName` (string, optional) - Name of the museum
+- `visitDate` (date, optional) - Date of visit
 
 **Response (201 - Created):**
 ```json
@@ -227,20 +287,52 @@ Create a new order and initiate Midtrans payment transaction.
   "order": {
     "id": 1,
     "UserId": 1,
-    "price_amount": 50000,
+    "price_amount": 40000,
     "ticketQuantity": 2,
     "museumName": "National Museum",
     "visitDate": "2025-12-01",
     "status": "pending",
     "midtrans_orderId": "ORDER-1-1699999999999",
+    "qrString": null,
+    "ticketCode": null,
+    "paidAt": null,
+    "expiredAt": null,
     "createdAt": "2025-11-12T00:00:00.000Z",
     "updatedAt": "2025-11-12T00:00:00.000Z"
   },
+  "ticketPrice": 20000,
+  "totalPrice": 40000,
   "midtrans": {
     "token": "midtrans_snap_token_here",
     "redirect_url": "https://app.sandbox.midtrans.com/snap/v2/vtweb/..."
   }
 }
+```
+
+**Example Frontend Usage:**
+```javascript
+// Frontend displays price calculation
+const ticketPrice = 20000;
+const quantity = 2;
+const totalPrice = ticketPrice * quantity; // 40000
+
+// Send request
+const response = await fetch('/orders', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    ticketQuantity: quantity,
+    museumName: 'National Museum',
+    visitDate: '2025-12-01'
+  })
+});
+
+// Use midtrans.token for Snap payment
+const { midtrans } = await response.json();
+window.snap.pay(midtrans.token);
 ```
 
 ---
@@ -263,7 +355,7 @@ Check order payment status and sync with Midtrans.
     "status_message": "Success, transaction found",
     "transaction_id": "...",
     "order_id": "ORDER-1-1699999999999",
-    "gross_amount": "50000.00",
+    "gross_amount": "40000.00",
     "payment_type": "credit_card",
     "transaction_time": "2025-11-12 10:00:00",
     "transaction_status": "settlement",
@@ -272,18 +364,82 @@ Check order payment status and sync with Midtrans.
   "order": {
     "id": 1,
     "UserId": 1,
-    "price_amount": 50000,
+    "price_amount": 40000,
     "ticketQuantity": 2,
     "museumName": "National Museum",
     "visitDate": "2025-12-01",
     "status": "paid",
     "midtrans_orderId": "ORDER-1-1699999999999",
+    "ticketCode": "TIX-MHX6REEH-Z1EZ1D",
     "paidAt": "2025-11-12T10:00:00.000Z",
     "createdAt": "2025-11-12T00:00:00.000Z",
     "updatedAt": "2025-11-12T10:00:00.000Z"
   }
 }
 ```
+
+**Possible Order Status:**
+- `pending` - Payment not yet completed
+- `paid` - Payment successful (includes `ticketCode` and `paidAt`)
+- `cancelled` - Payment cancelled or denied
+- `expired` - Payment expired
+- `used` - Ticket has been used (future feature)
+
+---
+
+#### 3. Midtrans Webhook (Internal)
+This endpoint is called automatically by Midtrans server after payment status changes. **Not meant to be called directly by frontend.**
+
+**Endpoint:** `POST /orders/webhook`
+
+**Authentication:** Not required (verified using signature)
+
+**Purpose:**
+- Automatically updates order status when payment is completed
+- Generates ticket code when payment is successful
+- Updates `paidAt`, `expiredAt` timestamps
+
+**Request Body (sent by Midtrans):**
+```json
+{
+  "transaction_time": "2025-11-13 10:00:00",
+  "transaction_status": "settlement",
+  "transaction_id": "...",
+  "status_message": "midtrans payment notification",
+  "status_code": "200",
+  "signature_key": "...",
+  "payment_type": "credit_card",
+  "order_id": "ORDER-1-1699999999999",
+  "merchant_id": "...",
+  "gross_amount": "40000.00",
+  "fraud_status": "accept",
+  "currency": "IDR"
+}
+```
+
+**Security:**
+- Uses SHA512 signature verification
+- Validates request is from Midtrans server
+- Formula: `SHA512(order_id + status_code + gross_amount + server_key)`
+
+**Response (200 - OK):**
+```json
+{
+  "message": "Webhook processed successfully"
+}
+```
+
+**Setup Instructions:**
+1. Login to Midtrans Dashboard
+2. Go to Settings → Configuration
+3. Set **Notification URL**: `https://your-domain.com/orders/webhook`
+4. Save configuration
+
+**Transaction Status Mapping:**
+- `settlement` or `capture` → Order status: `paid` + Generate ticket code
+- `pending` → Order status: `pending`
+- `deny` or `cancel` → Order status: `cancelled`
+- `expire` → Order status: `expired`
 
 ---
 
@@ -591,6 +747,105 @@ Update an existing period.
 
 ---
 
+## Webhook Endpoints
+
+### Midtrans Payment Webhook
+
+**Important:** This endpoint is designed to be called by Midtrans server only, not by frontend applications.
+
+**Endpoint:** `POST /orders/webhook`
+
+**Authentication:** Not required (uses signature verification instead)
+
+**Purpose:**
+- Receives automatic payment status notifications from Midtrans
+- Updates order status in real-time when payment completes
+- Generates ticket code automatically upon successful payment
+
+**Request Body (sent by Midtrans):**
+```json
+{
+  "transaction_time": "2025-11-13 10:00:00",
+  "transaction_status": "settlement",
+  "transaction_id": "abc123-xyz789",
+  "status_message": "midtrans payment notification",
+  "status_code": "200",
+  "signature_key": "abc123...xyz789",
+  "payment_type": "credit_card",
+  "order_id": "ORDER-1-1699999999999",
+  "merchant_id": "G000000000",
+  "gross_amount": "40000.00",
+  "fraud_status": "accept",
+  "currency": "IDR"
+}
+```
+
+**Response (200 - OK):**
+```json
+{
+  "message": "Webhook processed successfully"
+}
+```
+
+**Security Features:**
+1. **Signature Verification**: Uses SHA512 hash to verify request authenticity
+2. **Formula**: `SHA512(order_id + status_code + gross_amount + server_key)`
+3. **Validation**: Rejects requests with invalid signatures (403 Forbidden)
+
+**Transaction Status Handling:**
+
+| Midtrans Status | Order Status Updated | Actions |
+|-----------------|---------------------|---------|
+| `settlement` | `paid` | Set `paidAt`, generate `ticketCode` |
+| `capture` (with fraud_status='accept') | `paid` | Set `paidAt`, generate `ticketCode` |
+| `pending` | `pending` | No action |
+| `deny` | `cancelled` | No ticket code generated |
+| `cancel` | `cancelled` | No ticket code generated |
+| `expire` | `expired` | Set `expiredAt` |
+
+**Error Responses:**
+
+403 - Invalid Signature:
+```json
+{
+  "message": "Invalid signature"
+}
+```
+
+404 - Order Not Found:
+```json
+{
+  "message": "Order not found"
+}
+```
+
+**Setup Instructions:**
+
+1. **Login to Midtrans Dashboard**
+   - Sandbox: https://dashboard.sandbox.midtrans.com
+   - Production: https://dashboard.midtrans.com
+
+2. **Configure Notification URL**
+   - Go to: Settings → Configuration
+   - Set **Notification URL**: `https://your-domain.com/orders/webhook`
+   - Save configuration
+
+3. **Testing Webhook (Development)**
+   - Use ngrok or localtunnel to expose localhost
+   - Update Notification URL with public URL
+   - Or use the provided test script: `test-webhook-complete.js`
+
+**Example Test Script Usage:**
+```bash
+# Make sure server is running
+npm start
+
+# In another terminal, run test script
+node test-webhook-complete.js
+```
+
+---
+
 ## Error Responses
 
 ### Common Error Responses
@@ -609,6 +864,14 @@ or
 ```json
 {
   "message": "Message is too long. Maximum 1000 characters"
+}
+```
+
+or
+
+```json
+{
+  "message": "ticketQuantity must be at least 1"
 }
 ```
 
@@ -719,20 +982,33 @@ Server encountered an unexpected error.
 {
   id: integer
   UserId: integer (foreign key)
-  price_amount: integer
+  price_amount: integer (calculated as: 20000 × ticketQuantity)
   midtrans_orderId: string (nullable)
-  qrString: text (nullable)
-  ticketCode: string (nullable)
+  qrString: text (nullable, reserved for future QR code feature)
+  ticketCode: string (nullable, auto-generated when payment is successful)
   status: string ("pending" | "paid" | "cancelled" | "expired" | "used")
-  paidAt: datetime (nullable)
-  expiredAt: datetime (nullable)
+  paidAt: datetime (nullable, set when payment is successful)
+  expiredAt: datetime (nullable, set when payment expires)
   museumName: string (nullable)
   visitDate: datetime (nullable)
-  ticketQuantity: integer (default: 1)
+  ticketQuantity: integer (default: 1, minimum: 1)
   createdAt: datetime
   updatedAt: datetime
 }
 ```
+
+**Order Status Lifecycle:**
+```
+pending → paid (payment successful via webhook)
+       → cancelled (payment denied/cancelled)
+       → expired (payment timeout)
+       → used (ticket used - future feature)
+```
+
+**Ticket Code Format:**
+- Generated when payment is successful
+- Format: `TIX-{timestamp}-{random}` 
+- Example: `TIX-MHX6REEH-Z1EZ1D`
 
 ---
 
@@ -755,7 +1031,18 @@ Server encountered an unexpected error.
 ### Payment Integration
 - Orders use Midtrans payment gateway
 - Support for multiple payment methods through Midtrans
+- **Fixed ticket price: Rp 20,000 per ticket**
+- Total price calculated automatically by backend: `20,000 × ticketQuantity`
 - Transaction status can be checked via the status endpoint
+- **Webhook integration** for automatic order status updates
+- Ticket code automatically generated upon successful payment
+
+**Payment Flow:**
+1. User creates order → receives Snap token
+2. User pays via Midtrans Snap
+3. Midtrans sends webhook notification to backend
+4. Backend automatically updates order status and generates ticket code
+5. Frontend can poll order status or listen for updates
 
 ### AI Chat
 - Powered by Google Gemini AI
@@ -835,6 +1122,95 @@ npm test
 
 Test files are located in the `__test__/` directory.
 
+### Testing Webhook (Development)
+
+To test the Midtrans webhook in development environment:
+
+**Option 1: Use Test Script**
+```bash
+# Make sure server is running
+npm start
+
+# In another terminal
+node test-webhook-complete.js
+```
+
+**Option 2: Use Postman/Thunder Client**
+1. Generate webhook payload using helper:
+```javascript
+const { generateWebhookPayload } = require('./helpers/midtransSignature');
+const payload = generateWebhookPayload('ORDER-1-123', '40000.00', 'settlement');
+```
+
+2. Send POST request to `http://localhost:3000/orders/webhook` with the generated payload
+
+**Option 3: Use ngrok for Real Webhook**
+```bash
+# Install ngrok (if not installed)
+npm install -g ngrok
+
+# Expose local server
+ngrok http 3000
+
+# Use ngrok URL in Midtrans Dashboard
+# Example: https://abc123.ngrok.io/orders/webhook
+```
+
 ---
 
-*Last updated: November 12, 2025*
+## Order & Payment Flow Summary
+
+### Complete User Journey
+
+```
+1. 🛒 USER SELECTS TICKETS
+   Frontend: User selects quantity (e.g., 3 tickets)
+   Display: 3 × Rp 20.000 = Rp 60.000
+
+2. 🔐 CREATE ORDER
+   POST /orders
+   {
+     "ticketQuantity": 3,
+     "museumName": "Museum Nasional",
+     "visitDate": "2025-12-01"
+   }
+   
+   Response: { midtrans: { token, redirect_url } }
+
+3. 💳 PAYMENT
+   Frontend: Open Midtrans Snap with token
+   User: Complete payment in Snap interface
+
+4. 🔔 WEBHOOK (Automatic)
+   Midtrans → POST /orders/webhook
+   Backend: 
+   - Verify signature
+   - Update order status → 'paid'
+   - Generate ticketCode
+   - Set paidAt timestamp
+
+5. ✅ CONFIRMATION
+   Frontend: Poll GET /orders/:id/status
+   Display: Order paid, show ticketCode
+```
+
+### Security Features
+
+1. **Backend Price Validation**
+   - Price fixed at Rp 20,000 per ticket
+   - Frontend cannot manipulate price
+   - Total calculated by backend only
+
+2. **Webhook Signature Verification**
+   - SHA512 hash validation
+   - Prevents unauthorized webhook calls
+   - Ensures authenticity from Midtrans
+
+3. **JWT Authentication**
+   - Required for order creation
+   - Protects user data
+   - Role-based access control
+
+---
+
+*Last updated: November 13, 2025*
