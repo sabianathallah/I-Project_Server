@@ -10,7 +10,7 @@ module.exports = {
     const periodsData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
     const periods = periodsData.map(el => {
-      delete el.id;
+      // Keep the ID from JSON to maintain foreign key relationships
       el.createdAt = el.updatedAt = new Date();
       return el;
     });

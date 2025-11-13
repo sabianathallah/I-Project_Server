@@ -1,18 +1,18 @@
 [
   {
     "id": 1,
-    "name_ofPeriod": "Prasejarah"
+    "name_ofPeriod": "Masa Muda (1921-1945)"
   },
   {
     "id": 2,
-    "name_ofPeriod": "Klasik (Hindu-Buddha)"
+    "name_ofPeriod": "Karier Militer (1945-1966)"
   },
   {
     "id": 3,
-    "name_ofPeriod": "Islam"
+    "name_ofPeriod": "Masa Pemerintahan (1966-1998)"
   },
   {
     "id": 4,
-    "name_ofPeriod": "Kolonial"
+    "name_ofPeriod": "Pasca Pemerintahan (1998-2008)"
   }
 ]

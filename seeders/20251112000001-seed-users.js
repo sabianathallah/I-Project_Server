@@ -11,7 +11,7 @@ module.exports = {
     const usersData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
     const users = usersData.map(el => {
-      delete el.id;
+      // Keep the ID from JSON to maintain foreign key relationships
       // Hash password before inserting
       const salt = bcrypt.genSaltSync(10);
       el.password = bcrypt.hashSync(el.password, salt);
