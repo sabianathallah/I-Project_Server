@@ -64,10 +64,35 @@ describe('Chat Endpoints', () => {
         .send({});
 
       expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('message');
+      expect(response.body).toHaveProperty('message', 'Message is required');
     });
 
-    test('should handle chat request with authentication', async () => {
+    test('400 failed - empty message', async () => {
+      const response = await request(app)
+        .post('/chat')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          message: '   '
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('message', 'Message is required');
+    });
+
+    test('400 failed - message too long', async () => {
+      const longMessage = 'a'.repeat(1001);
+      const response = await request(app)
+        .post('/chat')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          message: longMessage
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('message', 'Message is too long. Maximum 1000 characters');
+    });
+
+    test('200 success - chat request with valid authentication and message', async () => {
       const response = await request(app)
         .post('/chat')
         .set('Authorization', `Bearer ${userToken}`)
@@ -76,10 +101,19 @@ describe('Chat Endpoints', () => {
         });
 
       // Note: Actual response depends on Gemini API configuration
-      // The endpoint should at least be accessible with proper auth
-      // Status could be 200 (success), 400 (validation error), or 500 (API error)
-      expect([200, 400, 500]).toContain(response.status);
-      expect(response.body).toHaveProperty('message');
+      // The endpoint should return proper structure
+      expect([200, 500]).toContain(response.status);
+      
+      if (response.status === 200) {
+        expect(response.body).toHaveProperty('message', 'Success');
+        expect(response.body).toHaveProperty('data');
+        expect(response.body.data).toHaveProperty('userMessage');
+        expect(response.body.data).toHaveProperty('aiResponse');
+        expect(response.body.data).toHaveProperty('timestamp');
+      } else {
+        // If Gemini API fails, we should get error message
+        expect(response.body).toHaveProperty('message');
+      }
     });
   });
 });

@@ -178,4 +178,37 @@ describe('Admin Period Endpoints', () => {
       expect(response.status).toBe(403);
     });
   });
+
+  describe('DELETE /periods/:id', () => {
+    test('401 failed - no token provided', async () => {
+      const response = await request(app).delete(`/periods/${testPeriodId}`);
+
+      expect(response.status).toBe(401);
+    });
+
+    test('403 failed - user role not authorized', async () => {
+      const response = await request(app)
+        .delete(`/periods/${testPeriodId}`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(403);
+    });
+
+    test('404 failed delete - period not found', async () => {
+      const response = await request(app)
+        .delete('/periods/99999')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(404);
+    });
+
+    test('200 success delete period with admin token', async () => {
+      const response = await request(app)
+        .delete(`/periods/${testPeriodId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('message');
+    });
+  });
 });

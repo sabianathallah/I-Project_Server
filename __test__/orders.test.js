@@ -5,12 +5,14 @@ if (process.env.NODE_ENV !== 'production') {
 
 const request = require('supertest');
 const app = require('../app');
-const { sequelize, User, Period } = require('../models');
+const { sequelize, User, Period, Order } = require('../models');
 const { signToken } = require('../helpers/jwt');
+const crypto = require('crypto');
 
 let userToken;
 let testPeriodId;
 let testOrderId;
+let testOrder;
 
 beforeAll(async () => {
   await sequelize.sync({ force: true });
@@ -56,12 +58,15 @@ describe('Order Endpoints', () => {
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('order');
       expect(response.body).toHaveProperty('midtrans');
-      expect(response.body).toHaveProperty('ticketPrice');
-      expect(response.body).toHaveProperty('totalPrice');
+      expect(response.body).toHaveProperty('ticketPrice', 20000);
+      expect(response.body).toHaveProperty('totalPrice', 40000);
+      expect(response.body.order).toHaveProperty('ticketQuantity', 2);
+      expect(response.body.order).toHaveProperty('price_amount', 40000);
       
-      // Save order ID for later tests
+      // Save order for later tests
       if (response.body.order && response.body.order.id) {
         testOrderId = response.body.order.id;
+        testOrder = response.body.order;
       }
     });
 
@@ -132,6 +137,184 @@ describe('Order Endpoints', () => {
         // Skip if no order was created
         expect(true).toBe(true);
       }
+    });
+  });
+
+  describe('POST /orders/webhook', () => {
+    beforeEach(async () => {
+      // Create a test order for webhook testing
+      if (!testOrder) {
+        const user = await User.findOne({ where: { email: 'orderuser@mail.com' } });
+        const order = await Order.create({
+          UserId: user.id,
+          price_amount: 40000,
+          ticketQuantity: 2,
+          museumName: 'Test Museum',
+          visitDate: '2025-12-01',
+          status: 'pending',
+          midtrans_orderId: 'TEST-ORDER-123'
+        });
+        testOrder = order;
+      }
+    });
+
+    test('should reject webhook with invalid signature', async () => {
+      const notification = {
+        order_id: testOrder.midtrans_orderId,
+        status_code: '200',
+        gross_amount: '40000.00',
+        signature_key: 'invalid-signature',
+        transaction_status: 'settlement'
+      };
+
+      const response = await request(app)
+        .post('/orders/webhook')
+        .send(notification);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toHaveProperty('message', 'Invalid signature');
+    });
+
+    test('should handle webhook with valid signature - settlement', async () => {
+      const orderId = testOrder.midtrans_orderId;
+      const statusCode = '200';
+      const grossAmount = '40000.00';
+      const serverKey = process.env.MIDTRANS_SERVER_KEY;
+
+      // Generate valid signature
+      const signatureKey = crypto
+        .createHash('sha512')
+        .update(`${orderId}${statusCode}${grossAmount}${serverKey}`)
+        .digest('hex');
+
+      const notification = {
+        order_id: orderId,
+        status_code: statusCode,
+        gross_amount: grossAmount,
+        signature_key: signatureKey,
+        transaction_status: 'settlement',
+        fraud_status: 'accept'
+      };
+
+      const response = await request(app)
+        .post('/orders/webhook')
+        .send(notification);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('message', 'Webhook processed successfully');
+
+      // Verify order status updated
+      const updatedOrder = await Order.findByPk(testOrder.id);
+      expect(updatedOrder.status).toBe('paid');
+      expect(updatedOrder.paidAt).not.toBeNull();
+      expect(updatedOrder.ticketCode).not.toBeNull();
+    });
+
+    test('should handle webhook with valid signature - pending', async () => {
+      // Create new order for pending test
+      const user = await User.findOne({ where: { email: 'orderuser@mail.com' } });
+      const pendingOrder = await Order.create({
+        UserId: user.id,
+        price_amount: 20000,
+        ticketQuantity: 1,
+        museumName: 'Test Museum 2',
+        status: 'pending',
+        midtrans_orderId: 'TEST-ORDER-PENDING-456'
+      });
+
+      const orderId = pendingOrder.midtrans_orderId;
+      const statusCode = '201';
+      const grossAmount = '20000.00';
+      const serverKey = process.env.MIDTRANS_SERVER_KEY;
+
+      const signatureKey = crypto
+        .createHash('sha512')
+        .update(`${orderId}${statusCode}${grossAmount}${serverKey}`)
+        .digest('hex');
+
+      const notification = {
+        order_id: orderId,
+        status_code: statusCode,
+        gross_amount: grossAmount,
+        signature_key: signatureKey,
+        transaction_status: 'pending'
+      };
+
+      const response = await request(app)
+        .post('/orders/webhook')
+        .send(notification);
+
+      expect(response.status).toBe(200);
+
+      const updatedOrder = await Order.findByPk(pendingOrder.id);
+      expect(updatedOrder.status).toBe('pending');
+    });
+
+    test('should handle webhook with valid signature - cancel', async () => {
+      // Create new order for cancel test
+      const user = await User.findOne({ where: { email: 'orderuser@mail.com' } });
+      const cancelOrder = await Order.create({
+        UserId: user.id,
+        price_amount: 20000,
+        ticketQuantity: 1,
+        museumName: 'Test Museum 3',
+        status: 'pending',
+        midtrans_orderId: 'TEST-ORDER-CANCEL-789'
+      });
+
+      const orderId = cancelOrder.midtrans_orderId;
+      const statusCode = '200';
+      const grossAmount = '20000.00';
+      const serverKey = process.env.MIDTRANS_SERVER_KEY;
+
+      const signatureKey = crypto
+        .createHash('sha512')
+        .update(`${orderId}${statusCode}${grossAmount}${serverKey}`)
+        .digest('hex');
+
+      const notification = {
+        order_id: orderId,
+        status_code: statusCode,
+        gross_amount: grossAmount,
+        signature_key: signatureKey,
+        transaction_status: 'cancel'
+      };
+
+      const response = await request(app)
+        .post('/orders/webhook')
+        .send(notification);
+
+      expect(response.status).toBe(200);
+
+      const updatedOrder = await Order.findByPk(cancelOrder.id);
+      expect(updatedOrder.status).toBe('cancelled');
+    });
+
+    test('should return 404 if order not found', async () => {
+      const orderId = 'NON-EXISTENT-ORDER';
+      const statusCode = '200';
+      const grossAmount = '20000.00';
+      const serverKey = process.env.MIDTRANS_SERVER_KEY;
+
+      const signatureKey = crypto
+        .createHash('sha512')
+        .update(`${orderId}${statusCode}${grossAmount}${serverKey}`)
+        .digest('hex');
+
+      const notification = {
+        order_id: orderId,
+        status_code: statusCode,
+        gross_amount: grossAmount,
+        signature_key: signatureKey,
+        transaction_status: 'settlement'
+      };
+
+      const response = await request(app)
+        .post('/orders/webhook')
+        .send(notification);
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('message', 'Order not found');
     });
   });
 });
