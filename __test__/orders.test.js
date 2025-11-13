@@ -48,7 +48,6 @@ describe('Order Endpoints', () => {
         .post('/orders')
         .set('Authorization', `Bearer ${userToken}`)
         .send({
-          price_amount: 200000,
           ticketQuantity: 2,
           museumName: 'Test Museum',
           visitDate: '2025-12-01'
@@ -57,6 +56,8 @@ describe('Order Endpoints', () => {
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('order');
       expect(response.body).toHaveProperty('midtrans');
+      expect(response.body).toHaveProperty('ticketPrice');
+      expect(response.body).toHaveProperty('totalPrice');
       
       // Save order ID for later tests
       if (response.body.order && response.body.order.id) {
@@ -64,12 +65,12 @@ describe('Order Endpoints', () => {
       }
     });
 
-    test('400 failed create order - price_amount is required', async () => {
+    test('400 failed create order - ticketQuantity must be at least 1', async () => {
       const response = await request(app)
         .post('/orders')
         .set('Authorization', `Bearer ${userToken}`)
         .send({
-          ticketQuantity: 2
+          ticketQuantity: 0
         });
 
       expect(response.status).toBe(400);
@@ -80,8 +81,8 @@ describe('Order Endpoints', () => {
       const response = await request(app)
         .post('/orders')
         .send({
-          price_amount: 200000,
-          ticketQuantity: 2
+          ticketQuantity: 2,
+          museumName: 'Test Museum'
         });
 
       expect(response.status).toBe(401);
@@ -93,8 +94,8 @@ describe('Order Endpoints', () => {
         .post('/orders')
         .set('Authorization', 'Bearer invalid-token-here')
         .send({
-          price_amount: 200000,
-          ticketQuantity: 2
+          ticketQuantity: 2,
+          museumName: 'Test Museum'
         });
 
       expect(response.status).toBe(401);
