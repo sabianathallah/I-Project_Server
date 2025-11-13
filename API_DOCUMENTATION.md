@@ -5,6 +5,8 @@
 http://localhost:3000
 ```
 
+> **Note:** Port dapat disesuaikan melalui environment variable `PORT`. Default: 3000
+
 ---
 
 ## 🔔 Important Updates (v2.0)
@@ -67,6 +69,42 @@ http://localhost:3000
 
 ---
 
+## API Endpoints Summary
+
+### Public Endpoints (No Authentication)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/register` | Register new user account |
+| POST | `/login` | Login with email and password |
+| POST | `/google-login` | Login with Google OAuth |
+| GET | `/pub/articles` | Get all articles (public) |
+| GET | `/pub/articles/:id` | Get article by ID (public) |
+| GET | `/pub/periods` | Get all periods (public) |
+| POST | `/orders/webhook` | Midtrans payment webhook (called by Midtrans) |
+
+### User Endpoints (Authentication Required)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/orders` | Create order and initiate payment |
+| GET | `/orders/:id/status` | Get order payment status |
+| POST | `/chat` | Send message to AI chatbot |
+
+### Admin Endpoints (Authentication + Admin Role Required)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/articles` | Get all articles (admin) |
+| GET | `/articles/:id` | Get article by ID (admin) |
+| POST | `/articles` | Create new article |
+| PUT | `/articles/:id` | Update article |
+| DELETE | `/articles/:id` | Delete article |
+| PATCH | `/articles/upload/:id` | Upload article image |
+| GET | `/periods` | Get all periods (admin) |
+| POST | `/periods` | Create new period |
+| PUT | `/periods/:id` | Update period |
+| DELETE | `/periods/:id` | Delete period |
+
+---
+
 ## Authentication
 
 ### 1. Register
@@ -86,11 +124,32 @@ Create a new user account.
 }
 ```
 
+**Request Body Fields:**
+- `email` (string, required) - User email address (must be unique)
+- `password` (string, required) - User password (will be hashed automatically)
+- `fullName` (string, required) - Full name of the user
+- `role` (string, optional) - User role, either "admin" or "user" (default: "user")
+
 **Response (201 - Created):**
 ```json
 {
   "message": "Success create new user",
   "email": "user@example.com"
+}
+```
+
+**Response (400 - Bad Request):**
+```json
+{
+  "message": "Email is required"
+}
+```
+
+or
+
+```json
+{
+  "message": "email must be unique"
 }
 ```
 
@@ -111,10 +170,22 @@ Login with email and password.
 }
 ```
 
+**Validation:**
+- Email is required
+- Password is required
+- Both fields cannot be empty
+
 **Response (200 - OK):**
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response (401 - Unauthorized):**
+```json
+{
+  "message": "Invalid email or password"
 }
 ```
 
@@ -385,6 +456,24 @@ Check order payment status and sync with Midtrans.
 - `expired` - Payment expired
 - `used` - Ticket has been used (future feature)
 
+**Note:** The `/orders/:id/status` endpoint checks the current status from Midtrans and automatically updates the local database. If the transaction is not found in Midtrans (404), it returns a special response indicating the transaction may still be processing.
+
+**Response (200 - Transaction Not Found):**
+```json
+{
+  "message": "Transaction not found in Midtrans (may still be processing)",
+  "order": {
+    "id": 1,
+    "UserId": 1,
+    "status": "pending",
+    ...
+  },
+  "midtrans": {
+    "status": "not_found"
+  }
+}
+```
+
 ---
 
 #### 3. Midtrans Webhook (Internal)
@@ -570,21 +659,45 @@ Create a new article.
 ```json
 {
   "title": "New Article Title",
+  "summary": "Article summary (optional)",
   "content": "Article content here...",
   "PeriodId": 1
 }
 ```
+
+**Request Body Fields:**
+- `title` (string, required) - Article title
+- `summary` (string, optional) - Short summary of the article
+- `content` (text, required) - Full article content
+- `PeriodId` (integer, required) - ID of the associated period
 
 **Response (201 - Created):**
 ```json
 {
   "id": 2,
   "title": "New Article Title",
+  "summary": "Article summary (optional)",
   "content": "Article content here...",
   "PeriodId": 1,
   "UserId": 1,
+  "imageUrl": null,
   "updatedAt": "2025-11-12T10:00:00.000Z",
   "createdAt": "2025-11-12T10:00:00.000Z"
+}
+```
+
+**Response (400 - Bad Request):**
+```json
+{
+  "message": "title cannot be null"
+}
+```
+
+or
+
+```json
+{
+  "message": "Invalid input"
 }
 ```
 
@@ -604,22 +717,37 @@ Update an existing article.
 ```json
 {
   "title": "Updated Article Title",
+  "summary": "Updated summary",
   "content": "Updated article content here...",
   "PeriodId": 1
 }
 ```
+
+**Request Body Fields:**
+- `title` (string, required) - Updated article title
+- `summary` (string, optional) - Updated summary
+- `content` (text, required) - Updated article content
+- `PeriodId` (integer, required) - ID of the associated period
 
 **Response (200 - OK):**
 ```json
 {
   "id": 1,
   "title": "Updated Article Title",
+  "summary": "Updated summary",
   "content": "Updated article content here...",
   "imageUrl": "https://example.com/image.jpg",
   "UserId": 1,
   "PeriodId": 1,
   "createdAt": "2025-11-12T00:00:00.000Z",
   "updatedAt": "2025-11-12T11:00:00.000Z"
+}
+```
+
+**Response (404 - Not Found):**
+```json
+{
+  "message": "Data not found"
 }
 ```
 
@@ -747,6 +875,32 @@ Update an existing period.
 
 ---
 
+#### 4. Delete Period
+Delete an existing period.
+
+**Endpoint:** `DELETE /periods/:id`
+
+**Authentication:** Required (Admin only)
+
+**URL Parameters:**
+- `id` (integer) - Period ID
+
+**Response (200 - OK):**
+```json
+{
+  "message": "Period deleted successfully"
+}
+```
+
+**Response (404 - Not Found):**
+```json
+{
+  "message": "Data not found"
+}
+```
+
+---
+
 ## Webhook Endpoints
 
 ### Midtrans Payment Webhook
@@ -850,12 +1004,44 @@ node test-webhook-complete.js
 
 ### Common Error Responses
 
+All error responses follow this format:
+```json
+{
+  "message": "Error description"
+}
+```
+
+### HTTP Status Codes
+
+| Status Code | Meaning | When Used |
+|-------------|---------|-----------|
+| 200 | OK | Successful GET, PUT, PATCH requests |
+| 201 | Created | Successful POST requests (resource created) |
+| 400 | Bad Request | Invalid input, missing required fields, validation errors |
+| 401 | Unauthorized | Missing/invalid token, wrong credentials |
+| 403 | Forbidden | Valid token but insufficient permissions (not admin) |
+| 404 | Not Found | Resource not found (article, period, order, etc.) |
+| 413 | Payload Too Large | Request body exceeds size limit |
+| 500 | Internal Server Error | Unexpected server error |
+
+---
+
+### Detailed Error Examples
+
 #### 400 - Bad Request
 Missing required fields or invalid input.
 
 ```json
 {
   "message": "Email is required"
+}
+```
+
+or
+
+```json
+{
+  "message": "Please input email or password"
 }
 ```
 
@@ -875,14 +1061,11 @@ or
 }
 ```
 
----
-
-#### 401 - Unauthorized
-Missing or invalid authentication token.
+or
 
 ```json
 {
-  "message": "Invalid token"
+  "message": "File is required"
 }
 ```
 
@@ -890,7 +1073,50 @@ or
 
 ```json
 {
-  "message": "User is not authenticated"
+  "message": "File size is too large"
+}
+```
+
+or
+
+```json
+{
+  "message": "Invalid input"
+}
+```
+
+---
+
+#### 401 - Unauthorized
+Missing or invalid authentication token.
+
+```json
+{
+  "message": "Please login first"
+}
+```
+
+or
+
+```json
+{
+  "message": "Invalid email or password"
+}
+```
+
+or
+
+```json
+{
+  "message": "Token has expired, please login again"
+}
+```
+
+or
+
+```json
+{
+  "message": "Invalid Google token"
 }
 ```
 
@@ -901,7 +1127,15 @@ User does not have permission to access the resource (not an admin).
 
 ```json
 {
-  "message": "Forbidden"
+  "message": "You dont have any access"
+}
+```
+
+or (for webhook with invalid signature)
+
+```json
+{
+  "message": "Invalid signature"
 }
 ```
 
@@ -931,7 +1165,26 @@ Server encountered an unexpected error.
 
 ```json
 {
-  "message": "Internal server error"
+  "message": "Internal Server Error"
+}
+```
+
+or (for payment gateway errors)
+
+```json
+{
+  "message": "Payment gateway error"
+}
+```
+
+---
+
+#### 413 - Payload Too Large
+Request body is too large.
+
+```json
+{
+  "message": "Request body is too large"
 }
 ```
 
@@ -1017,16 +1270,29 @@ pending → paid (payment successful via webhook)
 ### Authentication
 - Most endpoints require JWT authentication
 - Include the token in the Authorization header: `Bearer <token>`
-- Token is obtained from `/login` or `/register` endpoints
+- Token is obtained from `/login`, `/register`, or `/google-login` endpoints
+- Token payload contains: `{ id, email, role }`
+- Tokens do not expire by default (consider implementing expiration for production)
+
+### Request/Response Format
+- All requests and responses use JSON format
+- Content-Type header: `application/json`
+- Exception: Image upload endpoints use `multipart/form-data`
+- All datetime fields are in ISO 8601 format (UTC)
 
 ### Authorization
 - Admin-only endpoints require `role: "admin"` in the user profile
 - Regular users cannot access admin endpoints
+- Admin endpoints return `403 Forbidden` if accessed by non-admin users
+- Authorization middleware checks user role after authentication
 
 ### File Upload
 - Image upload uses ImageKit service
 - Supported formats: JPG, PNG, and other common image formats
-- Maximum file size depends on server configuration
+- Maximum file size depends on server configuration and Multer settings
+- Uses multipart/form-data encoding
+- File field name must be `file`
+- Returns ImageKit CDN URL after successful upload
 
 ### Payment Integration
 - Orders use Midtrans payment gateway
@@ -1048,12 +1314,29 @@ pending → paid (payment successful via webhook)
 - Powered by Google Gemini AI
 - Maximum message length: 1000 characters
 - Requires user authentication
+- Returns AI-generated responses based on user input
+- Includes timestamp in response
+- Logs chat requests for monitoring purposes
+
+### Database
+- Uses PostgreSQL as the database
+- Sequelize ORM for database operations
+- Supports migrations and seeders for database management
+- Foreign key constraints enabled for data integrity
+
+### CORS
+- CORS enabled for all origins (development)
+- Adjust CORS settings for production environment
 
 ---
 
 ## Environment Variables Required
 
 ```env
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+
 # Database
 DB_USERNAME=your_db_username
 DB_PASSWORD=your_db_password
@@ -1078,38 +1361,184 @@ GEMINI_API_KEY=your_gemini_api_key
 IMAGEKIT_PUBLIC_KEY=your_imagekit_public_key
 IMAGEKIT_PRIVATE_KEY=your_imagekit_private_key
 IMAGEKIT_URL_ENDPOINT=your_imagekit_url_endpoint
-
-# Environment
-NODE_ENV=development
 ```
 
 ---
 
 ## Quick Start
 
+### Prerequisites
+- Node.js (v14 or higher)
+- PostgreSQL database
+- npm or yarn package manager
+
+### Installation Steps
+
 1. Install dependencies:
 ```bash
 npm install
 ```
 
-2. Set up environment variables in `.env` file
+2. Set up environment variables in `.env` file (see Environment Variables section)
 
-3. Run migrations:
+3. Create PostgreSQL database:
+```bash
+createdb your_database_name
+```
+
+4. Run migrations:
 ```bash
 npx sequelize-cli db:migrate
 ```
 
-4. Run seeders (optional):
+5. Run seeders (optional):
 ```bash
 npx sequelize-cli db:seed:all
 ```
 
-5. Start the server:
+6. Start the server:
 ```bash
 npm start
 ```
 
 The API will be available at `http://localhost:3000`
+
+---
+
+## Project Structure
+
+```
+I-Project_Server/
+├── __test__/              # Test files
+│   ├── admin-articles.test.js
+│   ├── admin-periods.test.js
+│   ├── auth.test.js
+│   ├── chat.test.js
+│   ├── orders.test.js
+│   ├── public-articles.test.js
+│   ├── public-periods.test.js
+│   └── setup.js
+├── bin/
+│   └── www.js            # Server entry point
+├── config/
+│   └── config.json       # Database configuration
+├── controllers/          # Request handlers
+│   ├── articleController.js
+│   ├── chatController.js
+│   ├── loginRegisterController.js
+│   ├── orderController.js
+│   ├── periodController.js
+│   └── uploadimageController.js
+├── data/                 # JSON data files
+├── helpers/              # Helper functions
+│   ├── bcrypt.js         # Password hashing
+│   ├── gemini.js         # AI integration
+│   ├── jwt.js            # Token management
+│   └── midtransSignature.js  # Webhook signature verification
+├── middlewares/          # Express middlewares
+│   ├── authentication.js # JWT authentication
+│   ├── authorization.js  # Role-based access control
+│   └── errorHandler.js   # Centralized error handling
+├── migrations/           # Database migrations
+├── models/               # Sequelize models
+│   ├── article.js
+│   ├── order.js
+│   ├── period.js
+│   ├── user.js
+│   └── index.js
+├── routes/               # API routes
+│   ├── article.js
+│   ├── chat.js
+│   ├── order.js
+│   ├── period.js
+│   └── index.js          # Main router
+├── seeders/              # Database seeders
+├── utility/              # Utility functions
+│   ├── imageKit.js       # ImageKit integration
+│   └── multer.js         # File upload configuration
+├── app.js                # Express app configuration
+├── package.json          # Dependencies and scripts
+└── API_DOCUMENTATION.md  # This file
+```
+
+---
+
+## Development Tips
+
+### Testing API Endpoints
+You can test the API using:
+- **Postman** - GUI-based API testing tool
+- **Thunder Client** - VS Code extension for API testing
+- **curl** - Command-line tool
+- **Supertest** - For automated testing (already configured)
+
+### Common Development Issues
+
+**Issue: "Please login first" error**
+- Solution: Make sure to include the Authorization header with a valid token
+- Format: `Authorization: Bearer YOUR_TOKEN_HERE`
+
+**Issue: "You dont have any access" error**
+- Solution: The endpoint requires admin role. Check your user's role in the database
+
+**Issue: "Transaction not found in Midtrans"**
+- Solution: This is normal for newly created orders. The transaction may still be processing
+
+**Issue: Order status not updating automatically**
+- Solution: Make sure Midtrans webhook is properly configured with your public URL
+- For local development, use ngrok or similar tool to expose localhost
+
+### Database Migrations
+```bash
+# Create new migration
+npx sequelize-cli migration:generate --name migration-name
+
+# Run pending migrations
+npx sequelize-cli db:migrate
+
+# Undo last migration
+npx sequelize-cli db:migrate:undo
+
+# Reset database
+npx sequelize-cli db:migrate:undo:all
+```
+
+### Database Seeders
+```bash
+# Create new seeder
+npx sequelize-cli seed:generate --name seeder-name
+
+# Run all seeders
+npx sequelize-cli db:seed:all
+
+# Undo all seeders
+npx sequelize-cli db:seed:undo:all
+```
+
+### Logging
+The server logs important events including:
+- Chat requests and responses
+- Order creation and status updates
+- Webhook notifications from Midtrans
+- Authentication errors
+- General errors and stack traces (in development)
+
+---
+
+## Production Deployment Checklist
+
+- [ ] Set `NODE_ENV=production`
+- [ ] Use production Midtrans credentials (`isProduction: true`)
+- [ ] Configure proper CORS settings (restrict origins)
+- [ ] Set up SSL/HTTPS
+- [ ] Configure Midtrans webhook with production URL
+- [ ] Implement JWT token expiration
+- [ ] Set up proper logging and monitoring
+- [ ] Configure database connection pooling
+- [ ] Set appropriate request size limits
+- [ ] Enable rate limiting
+- [ ] Secure environment variables
+- [ ] Set up database backups
 
 ---
 
@@ -1121,6 +1550,22 @@ npm test
 ```
 
 Test files are located in the `__test__/` directory.
+
+**Available Test Suites:**
+- `admin-articles.test.js` - Tests for admin article endpoints
+- `admin-periods.test.js` - Tests for admin period endpoints
+- `auth.test.js` - Tests for authentication endpoints
+- `chat.test.js` - Tests for chat endpoints
+- `orders.test.js` - Tests for order and payment endpoints
+- `public-articles.test.js` - Tests for public article endpoints
+- `public-periods.test.js` - Tests for public period endpoints
+
+**Test Configuration:**
+- Uses Jest testing framework
+- Supertest for HTTP assertions
+- Setup file: `__test__/setup.js`
+- Test environment: Node.js
+- Tests run with `--detectOpenHandles` and `--forceExit` flags
 
 ### Testing Webhook (Development)
 
@@ -1213,4 +1658,46 @@ ngrok http 3000
 
 ---
 
-*Last updated: November 13, 2025*
+## Additional Resources
+
+### Related Documentation
+- [Express.js Documentation](https://expressjs.com/)
+- [Sequelize ORM Documentation](https://sequelize.org/)
+- [Midtrans API Documentation](https://docs.midtrans.com/)
+- [Google Gemini AI Documentation](https://ai.google.dev/)
+- [ImageKit Documentation](https://docs.imagekit.io/)
+
+### Useful Links
+- GitHub Repository: https://github.com/sabianathallah/I-Project_Server
+- Issue Tracker: https://github.com/sabianathallah/I-Project_Server/issues
+
+### API Version History
+
+**v2.0 (Current - November 2025)**
+- Fixed ticket pricing (Rp 20,000 per ticket)
+- Automatic webhook integration for order status
+- Enhanced error handling
+- Improved security with backend price validation
+- Added ticket code auto-generation
+- Better validation and error messages
+
+**v1.0 (Initial Release)**
+- Basic CRUD operations for articles and periods
+- User authentication with JWT
+- Google OAuth integration
+- Order management with Midtrans
+- AI chat integration
+
+---
+
+## Support & Contact
+
+For issues, questions, or contributions:
+1. Check the existing documentation
+2. Review test files for usage examples
+3. Open an issue on GitHub
+4. Contact the development team
+
+---
+
+*Last updated: November 14, 2025*
