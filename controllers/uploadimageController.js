@@ -1,5 +1,5 @@
 const imageKit = require("../utility/imageKit");
-const { Product } = require('../models')
+const { Article } = require('../models')
 
 class UploadimageController {
 
@@ -21,12 +21,12 @@ class UploadimageController {
                 fileName: originalname,
             });
 
-            // if route contains product id, update product.imageUrl
+            // if route contains article id, update article.imageUrl
             const { id } = req.params
             if (id) {
-                const product = await Product.findByPk(id)
-                if (product) {
-                    await product.update({ imageUrl: result.url })
+                const article = await Article.findByPk(id)
+                if (article) {
+                    await article.update({ imageUrl: result.url })
                 }
             }
 

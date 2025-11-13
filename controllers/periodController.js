@@ -43,6 +43,22 @@ class PeriodController {
             next(error);
         }
     }
+
+    static async delete(req, res, next) {
+        try {
+            const { Period } = require('../models');
+            const { id } = req.params;
+
+            const period = await Period.findByPk(id);
+            if (!period) throw { name: 'NotFound' };
+
+            await period.destroy();
+
+            res.status(200).json({ message: 'Period deleted successfully' });
+        } catch (error) {
+            next(error);
+        }   
+    }
 }
 
 module.exports = PeriodController;

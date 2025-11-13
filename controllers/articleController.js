@@ -29,11 +29,12 @@ class ArticleController {
   static async create(req, res, next) {
     try {
       const { Article } = require('../models');
-      const { title, content, PeriodId } = req.body;
+      const { title, summary, content, PeriodId } = req.body;
       const UserId = req.user.id;
 
       const newArticle = await Article.create({
         title,
+        summary,
         content,
         PeriodId,
         UserId
@@ -49,12 +50,13 @@ class ArticleController {
     try {
       const { Article } = require('../models');
       const { id } = req.params;
-      const { title, content, PeriodId } = req.body;
+      const { title, summary, content, PeriodId } = req.body;
 
       const article = await Article.findByPk(id);
       if (!article) throw { name: 'NotFound' };
 
       article.title = title;
+      article.summary = summary;
       article.content = content;
       article.PeriodId = PeriodId;
 

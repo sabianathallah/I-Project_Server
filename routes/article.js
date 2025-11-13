@@ -10,7 +10,7 @@ const middlewaresUpload = upload.single('file')
 router.get('/', ArticleController.read)
 router.post('/', ArticleController.create)
 router.patch('/upload/:id', middlewaresUpload, UploadimageController.uploadimage)
-router.get('/:id', ArticleController.detailById)
+router.get('/:id', ArticleController.detailById) 
 router.put('/:id', ArticleController.update)
 router.delete('/:id', ArticleController.delete)
 
