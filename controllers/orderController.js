@@ -30,7 +30,7 @@ module.exports = {
       });
 
       const snap = new midtransClient.Snap({
-        isProduction: process.env.NODE_ENV === 'production',
+        isProduction: false, // SELALU false kalau masih sandbox
         serverKey: process.env.MIDTRANS_SERVER_KEY,
         clientKey: process.env.MIDTRANS_CLIENT_KEY
       });
@@ -184,7 +184,7 @@ module.exports = {
       }
 
       const coreApi = new midtransClient.CoreApi({
-        isProduction: process.env.NODE_ENV === 'production',
+        isProduction: false, // SELALU false kalau masih sandbox
         serverKey: process.env.MIDTRANS_SERVER_KEY,
         clientKey: process.env.MIDTRANS_CLIENT_KEY
       });
