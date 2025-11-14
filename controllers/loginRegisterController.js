@@ -59,6 +59,12 @@ class LoginRegisterController {
         try {
             const { googleToken } = req.body;
 
+            // Validate that googleToken is provided
+            if (!googleToken) {
+                throw { name: "BadRequest", message: "Google token is required" };
+            }
+
+            // Verify the Google ID token
             const ticket = await client.verifyIdToken({
                 idToken: googleToken,
                 audience: process.env.GOOGLE_CLIENT_ID,
@@ -67,27 +73,44 @@ class LoginRegisterController {
             const payload = ticket.getPayload();
             const { email, name } = payload;
 
+            // Validate that email was provided by Google
+            if (!email) {
+                throw { name: "BadRequest", message: "Email not provided by Google" };
+            }
+
+            // Find or create user
             let user = await User.findOne({ where: { email } });
 
             if (!user) {
                 user = await User.create({
-                    fullName: name,
+                    fullName: name || email.split('@')[0],
                     email,
                     password: Math.random().toString(36).slice(-8), // Random password for Google users
+                    role: 'user'
                 });
             }
 
-            const access_token = signToken({ id: user.id, email: user.email });
+            // Generate JWT token with role included
+            const access_token = signToken({ 
+                id: user.id, 
+                email: user.email,
+                role: user.role 
+            });
+
             res.status(200).json({
                 access_token,
                 user: {
                     id: user.id,
                     fullName: user.fullName,
                     email: user.email,
-                    isMembership: user.isMembership
+                    role: user.role
                 }
             });
         } catch (error) {
+            // Handle Google Auth Library errors specifically
+            if (error.message && (error.message.includes('Token') || error.message.includes('Invalid'))) {
+                error.name = 'GoogleAuthError';
+            }
             next(error);
         }
     }

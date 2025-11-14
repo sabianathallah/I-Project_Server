@@ -80,9 +80,9 @@ const errorHandler = (err, req, res, next) => {
     }
 
     // Handle Google OAuth errors
-    if (err.message && err.message.includes('Token') && !err.name) {
+    if (err.name === 'GoogleAuthError') {
         status = 401
-        message = 'Invalid Google token'
+        message = 'Invalid or expired Google token'
     }
 
     // Handle errors with custom statusCode property
