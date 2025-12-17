@@ -95,7 +95,8 @@ Analisis:
     fs.writeFileSync(tempFile, requestBody);
     
     // Build curl command using file (quote path for spaces)
-    const curlCommand = `curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}" -H "Content-Type: application/json" -d @"${tempFile}"`;
+    // Using gemini-2.5-flash (newer model with separate quota pool)
+    const curlCommand = `curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}" -H "Content-Type: application/json" -d @"${tempFile}"`;
 
     // Execute curl
     const { stdout, stderr } = await execPromise(curlCommand);
